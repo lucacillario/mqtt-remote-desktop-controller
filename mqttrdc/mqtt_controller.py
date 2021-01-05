@@ -32,16 +32,32 @@ Toggle mute/unmute and play/pause:
 """
 
 from json import JSONDecodeError
-import alsaaudio
+from alsaaudio import ALSAAudioError
+
+# to run the unittest in an environment without an audio device
+try:
+    from alsaaudio import Mixer
+except ALSAAudioError as e:
+    if __name__ == "__main__":
+        raise
+    else:
+        print(f"No audio device: {e}")
+        Mixer = None
+
 import paho.mqtt.client as mqtt
 from paho.mqtt.properties import Properties
-# to run the unittest in an environment without X Server
+
+# to run the unittest in an environment without a display Server
 try:
     from pynput.keyboard import Key, Controller as KeyboardController
 except ImportError as e:
-    print(f"Cannot import pynput: {e}")
-    Key = None
-    KeyboardController = None
+    if __name__ == "__main__":
+        raise
+    else:
+        print(f"Cannot import pynput: {e}")
+        Key = None
+        KeyboardController = None
+
 import json
 from jsonschema import validate, ValidationError
 import logging
@@ -95,8 +111,8 @@ class MQTTController:
     }
 
     def __init__(self):
-        self.audio_mixer = alsaaudio.Mixer()
-        self.keyboard = KeyboardController()
+        self.audio_mixer = Mixer() if Mixer else None
+        self.keyboard = KeyboardController() if KeyboardController else None
         self.mqttc = mqtt.Client()
         self.mqttc.on_connect = self.on_connect
         self.mqttc.on_publish = self.on_publish
