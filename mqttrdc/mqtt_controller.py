@@ -35,7 +35,11 @@ from json import JSONDecodeError
 import alsaaudio
 import paho.mqtt.client as mqtt
 from paho.mqtt.properties import Properties
-from pynput.keyboard import Key, Controller as KeyboardController
+# to run the unittest in an environment without X Server
+try:
+    from pynput.keyboard import Key, Controller as KeyboardController
+except ImportError as e:
+    print(f"Cannot import pynput: {e}")
 import json
 from jsonschema import validate, ValidationError
 import logging
