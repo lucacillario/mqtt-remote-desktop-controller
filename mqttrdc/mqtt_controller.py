@@ -40,6 +40,8 @@ try:
     from pynput.keyboard import Key, Controller as KeyboardController
 except ImportError as e:
     print(f"Cannot import pynput: {e}")
+    Key = None
+    KeyboardController = None
 import json
 from jsonschema import validate, ValidationError
 import logging
