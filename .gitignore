@@ -1,0 +1,7 @@
+dist/
+mqttrdc.egg-info/
+*/__pycache__/
+__pycache__/
+.env
+.python-version
+.idea

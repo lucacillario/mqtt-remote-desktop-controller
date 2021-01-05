@@ -1,3 +1,5 @@
+![Python package](https://github.com/lucacillario/mqtt-remote-desktop-controller/workflows/Python%20package/badge.svg)
+
 This project allows you to remotely control some multimedia functionalities 
 of your desktop/laptop, through the MQTT protocol.
 
