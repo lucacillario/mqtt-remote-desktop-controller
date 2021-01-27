@@ -29,6 +29,11 @@ Mute and unmute:
 Toggle mute/unmute and play/pause:
 >>> {"toggle": "mute"}
 >>> {"toggle": "pause"}
+
+
+Skip forward/backward:
+>>> {"ctrl": ">>"}
+>>> {"ctrl": "<<"}
 """
 
 from json import JSONDecodeError
@@ -96,6 +101,11 @@ class MQTTController:
     toggle_schema = {
         "type": "object",
         "properties": {"toggle": {"type": "string", "enum": ["mute", "pause"]}},
+    }
+
+    ctrl_schema = {
+        "type": "object",
+        "properties": {"ctrl": {"type": "string", "enum": [">>", "<<"]}},
     }
 
     def __init__(self):
@@ -195,6 +205,9 @@ class MQTTController:
         elif "toggle" in payload:
             validate(payload, schema=self.toggle_schema)
             self.toggle_mute() if payload["toggle"] == "mute" else self.toggle_pause()
+        elif "ctrl" in payload:
+            validate(payload, schema=self.ctrl_schema)
+            self.skip_forward() if payload["ctrl"] == ">>" else self.skip_backward()
         else:
             raise ValueError(f"Cannot handle message: {payload}, not a valid command")
 
@@ -304,6 +317,22 @@ class MQTTController:
         """Toggle play/pause status by simulating a space bar press."""
         self.keyboard.press(Key.space)
         self.keyboard.release(Key.space)
+
+    def skip_forward(self) -> None:
+        """Skip forward.
+
+        How much the content will be skipped forward is platform dependant (usually 10 seconds).
+        """
+        self.keyboard.press(Key.right)
+        self.keyboard.release(Key.right)
+
+    def skip_backward(self) -> None:
+        """Skip backward.
+
+        How much the content will be skipped backward is platform dependant (usually 10 seconds).
+        """
+        self.keyboard.press(Key.left)
+        self.keyboard.release(Key.left)
 
     @property
     def status(self) -> dict:

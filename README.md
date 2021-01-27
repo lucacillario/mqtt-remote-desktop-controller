@@ -3,7 +3,7 @@
 This project allows you to remotely control some multimedia functionalities 
 of your desktop/laptop, through the MQTT protocol.
 
-You will be able to control the volume, mute/unmute and play/pause your
+You will be able to control the volume, mute/unmute, play/pause and skip forward/backward your
 content (Netflix, Prime Video, Disney+, Spotify and many more) comfortably 
 from your sofa.
 
@@ -155,9 +155,19 @@ Mute and unmute.
 ```
 Toggle mute/unmute and play/pause.
 
+```json
+{"ctrl": ">>"}
+```
+```json
+{"ctrl": "<<"}
+```
+Skip forward/backward.
+
 
 # Notes
-Toggle play/pause requires the focus to be on the target window.
-Also note that it works by simulating a *Space bar* press, so
-make sure the application you want to play/pause supports this
-shortcut.
+Toggle play/pause and skip forward/backward requires the focus to be on the target window.
+These commands work by taking advantage of the platform's keyboard shortcuts:
+- `Space bar` play/pause
+- `Arrow right/left` skip forward/backward
+
+Make sure the application you want to control supports these shortcuts!
