@@ -53,6 +53,10 @@ Status updates are sent in JSON format.</p>
 <pre><code class="language-python-repl">&gt;&gt;&gt; {&quot;toggle&quot;: &quot;mute&quot;}
 &gt;&gt;&gt; {&quot;toggle&quot;: &quot;pause&quot;}
 </code></pre>
+<p>Skip forward/backward:</p>
+<pre><code class="language-python-repl">&gt;&gt;&gt; {&quot;ctrl&quot;: &quot;&gt;&gt;&quot;}
+&gt;&gt;&gt; {&quot;ctrl&quot;: &quot;&lt;&lt;&quot;}
+</code></pre>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -88,13 +92,17 @@ Mute and unmute:
 Toggle mute/unmute and play/pause:
 &gt;&gt;&gt; {&#34;toggle&#34;: &#34;mute&#34;}
 &gt;&gt;&gt; {&#34;toggle&#34;: &#34;pause&#34;}
+
+
+Skip forward/backward:
+&gt;&gt;&gt; {&#34;ctrl&#34;: &#34;&gt;&gt;&#34;}
+&gt;&gt;&gt; {&#34;ctrl&#34;: &#34;&lt;&lt;&#34;}
 &#34;&#34;&#34;
 
 from json import JSONDecodeError
-import alsaaudio
+from alsaaudio import ALSAAudioError, Mixer as ALSAMixer
 import paho.mqtt.client as mqtt
 from paho.mqtt.properties import Properties
-from pynput.keyboard import Key, Controller as KeyboardController
 import json
 from jsonschema import validate, ValidationError
 import logging
@@ -102,6 +110,17 @@ import sys
 import time
 from typing import Any
 from mqttrdc.mqtt_controller_manager import MQTTControllerManager
+
+# to run the unittest in an environment without a display Server
+try:
+    from pynput.keyboard import Key, Controller as KeyboardController
+except ImportError as e:
+    if __name__ == &#34;__main__&#34;:
+        raise
+    else:
+        print(f&#34;Cannot import pynput: {e}&#34;)
+        Key = None
+        KeyboardController = None
 
 
 class MQTTController:
@@ -147,9 +166,22 @@ class MQTTController:
         &#34;properties&#34;: {&#34;toggle&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;enum&#34;: [&#34;mute&#34;, &#34;pause&#34;]}},
     }
 
+    ctrl_schema = {
+        &#34;type&#34;: &#34;object&#34;,
+        &#34;properties&#34;: {&#34;ctrl&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;enum&#34;: [&#34;&gt;&gt;&#34;, &#34;&lt;&lt;&#34;]}},
+    }
+
     def __init__(self):
-        self.audio_mixer = alsaaudio.Mixer()
-        self.keyboard = KeyboardController()
+        # to run the unittest in an environment without an audio device
+        try:
+            self.audio_mixer = ALSAMixer()
+        except ALSAAudioError as alsa_error:
+            if __name__ == &#34;__main__&#34;:
+                raise
+            else:
+                print(f&#34;No audio device: {alsa_error}&#34;)
+                self.audio_mixer = None
+        self.keyboard = KeyboardController() if KeyboardController else None
         self.mqttc = mqtt.Client()
         self.mqttc.on_connect = self.on_connect
         self.mqttc.on_publish = self.on_publish
@@ -236,6 +268,9 @@ class MQTTController:
         elif &#34;toggle&#34; in payload:
             validate(payload, schema=self.toggle_schema)
             self.toggle_mute() if payload[&#34;toggle&#34;] == &#34;mute&#34; else self.toggle_pause()
+        elif &#34;ctrl&#34; in payload:
+            validate(payload, schema=self.ctrl_schema)
+            self.skip_forward() if payload[&#34;ctrl&#34;] == &#34;&gt;&gt;&#34; else self.skip_backward()
         else:
             raise ValueError(f&#34;Cannot handle message: {payload}, not a valid command&#34;)
 
@@ -345,6 +380,22 @@ class MQTTController:
         &#34;&#34;&#34;Toggle play/pause status by simulating a space bar press.&#34;&#34;&#34;
         self.keyboard.press(Key.space)
         self.keyboard.release(Key.space)
+
+    def skip_forward(self) -&gt; None:
+        &#34;&#34;&#34;Skip forward.
+
+        How much the content will be skipped forward is platform dependant (usually 10 seconds).
+        &#34;&#34;&#34;
+        self.keyboard.press(Key.right)
+        self.keyboard.release(Key.right)
+
+    def skip_backward(self) -&gt; None:
+        &#34;&#34;&#34;Skip backward.
+
+        How much the content will be skipped backward is platform dependant (usually 10 seconds).
+        &#34;&#34;&#34;
+        self.keyboard.press(Key.left)
+        self.keyboard.release(Key.left)
 
     @property
     def status(self) -&gt; dict:
@@ -534,9 +585,22 @@ if __name__ == &#34;__main__&#34;:
         &#34;properties&#34;: {&#34;toggle&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;enum&#34;: [&#34;mute&#34;, &#34;pause&#34;]}},
     }
 
+    ctrl_schema = {
+        &#34;type&#34;: &#34;object&#34;,
+        &#34;properties&#34;: {&#34;ctrl&#34;: {&#34;type&#34;: &#34;string&#34;, &#34;enum&#34;: [&#34;&gt;&gt;&#34;, &#34;&lt;&lt;&#34;]}},
+    }
+
     def __init__(self):
-        self.audio_mixer = alsaaudio.Mixer()
-        self.keyboard = KeyboardController()
+        # to run the unittest in an environment without an audio device
+        try:
+            self.audio_mixer = ALSAMixer()
+        except ALSAAudioError as alsa_error:
+            if __name__ == &#34;__main__&#34;:
+                raise
+            else:
+                print(f&#34;No audio device: {alsa_error}&#34;)
+                self.audio_mixer = None
+        self.keyboard = KeyboardController() if KeyboardController else None
         self.mqttc = mqtt.Client()
         self.mqttc.on_connect = self.on_connect
         self.mqttc.on_publish = self.on_publish
@@ -623,6 +687,9 @@ if __name__ == &#34;__main__&#34;:
         elif &#34;toggle&#34; in payload:
             validate(payload, schema=self.toggle_schema)
             self.toggle_mute() if payload[&#34;toggle&#34;] == &#34;mute&#34; else self.toggle_pause()
+        elif &#34;ctrl&#34; in payload:
+            validate(payload, schema=self.ctrl_schema)
+            self.skip_forward() if payload[&#34;ctrl&#34;] == &#34;&gt;&gt;&#34; else self.skip_backward()
         else:
             raise ValueError(f&#34;Cannot handle message: {payload}, not a valid command&#34;)
 
@@ -733,6 +800,22 @@ if __name__ == &#34;__main__&#34;:
         self.keyboard.press(Key.space)
         self.keyboard.release(Key.space)
 
+    def skip_forward(self) -&gt; None:
+        &#34;&#34;&#34;Skip forward.
+
+        How much the content will be skipped forward is platform dependant (usually 10 seconds).
+        &#34;&#34;&#34;
+        self.keyboard.press(Key.right)
+        self.keyboard.release(Key.right)
+
+    def skip_backward(self) -&gt; None:
+        &#34;&#34;&#34;Skip backward.
+
+        How much the content will be skipped backward is platform dependant (usually 10 seconds).
+        &#34;&#34;&#34;
+        self.keyboard.press(Key.left)
+        self.keyboard.release(Key.left)
+
     @property
     def status(self) -&gt; dict:
         &#34;&#34;&#34;Gets the current status.
@@ -819,6 +902,10 @@ if __name__ == &#34;__main__&#34;:
 </details>
 <h3>Class variables</h3>
 <dl>
+<dt id="mqttrdc.mqtt_controller.MQTTController.ctrl_schema"><code class="name">var <span class="ident">ctrl_schema</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
 <dt id="mqttrdc.mqtt_controller.MQTTController.mute_schema"><code class="name">var <span class="ident">mute_schema</span></code></dt>
 <dd>
 <div class="desc"></div>
@@ -1028,6 +1115,9 @@ def volume(self) -&gt; int:
     elif &#34;toggle&#34; in payload:
         validate(payload, schema=self.toggle_schema)
         self.toggle_mute() if payload[&#34;toggle&#34;] == &#34;mute&#34; else self.toggle_pause()
+    elif &#34;ctrl&#34; in payload:
+        validate(payload, schema=self.ctrl_schema)
+        self.skip_forward() if payload[&#34;ctrl&#34;] == &#34;&gt;&gt;&#34; else self.skip_backward()
     else:
         raise ValueError(f&#34;Cannot handle message: {payload}, not a valid command&#34;)</code></pre>
 </details>
@@ -1122,6 +1212,44 @@ def volume(self) -&gt; int:
         logging.error(str(e))
     except Exception as e:
         logging.error(f&#34;Unexpected error while receiving a new message: {e}&#34;)</code></pre>
+</details>
+</dd>
+<dt id="mqttrdc.mqtt_controller.MQTTController.skip_backward"><code class="name flex">
+<span>def <span class="ident">skip_backward</span></span>(<span>self) ‑> NoneType</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Skip backward.</p>
+<p>How much the content will be skipped backward is platform dependant (usually 10 seconds).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def skip_backward(self) -&gt; None:
+    &#34;&#34;&#34;Skip backward.
+
+    How much the content will be skipped backward is platform dependant (usually 10 seconds).
+    &#34;&#34;&#34;
+    self.keyboard.press(Key.left)
+    self.keyboard.release(Key.left)</code></pre>
+</details>
+</dd>
+<dt id="mqttrdc.mqtt_controller.MQTTController.skip_forward"><code class="name flex">
+<span>def <span class="ident">skip_forward</span></span>(<span>self) ‑> NoneType</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Skip forward.</p>
+<p>How much the content will be skipped forward is platform dependant (usually 10 seconds).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def skip_forward(self) -&gt; None:
+    &#34;&#34;&#34;Skip forward.
+
+    How much the content will be skipped forward is platform dependant (usually 10 seconds).
+    &#34;&#34;&#34;
+    self.keyboard.press(Key.right)
+    self.keyboard.release(Key.right)</code></pre>
 </details>
 </dd>
 <dt id="mqttrdc.mqtt_controller.MQTTController.start"><code class="name flex">
@@ -1310,6 +1438,7 @@ def volume(self) -&gt; int:
 <li>
 <h4><code><a title="mqttrdc.mqtt_controller.MQTTController" href="#mqttrdc.mqtt_controller.MQTTController">MQTTController</a></code></h4>
 <ul class="two-column">
+<li><code><a title="mqttrdc.mqtt_controller.MQTTController.ctrl_schema" href="#mqttrdc.mqtt_controller.MQTTController.ctrl_schema">ctrl_schema</a></code></li>
 <li><code><a title="mqttrdc.mqtt_controller.MQTTController.handle_message" href="#mqttrdc.mqtt_controller.MQTTController.handle_message">handle_message</a></code></li>
 <li><code><a title="mqttrdc.mqtt_controller.MQTTController.mute" href="#mqttrdc.mqtt_controller.MQTTController.mute">mute</a></code></li>
 <li><code><a title="mqttrdc.mqtt_controller.MQTTController.mute_schema" href="#mqttrdc.mqtt_controller.MQTTController.mute_schema">mute_schema</a></code></li>
@@ -1318,6 +1447,8 @@ def volume(self) -&gt; int:
 <li><code><a title="mqttrdc.mqtt_controller.MQTTController.on_message" href="#mqttrdc.mqtt_controller.MQTTController.on_message">on_message</a></code></li>
 <li><code><a title="mqttrdc.mqtt_controller.MQTTController.on_publish" href="#mqttrdc.mqtt_controller.MQTTController.on_publish">on_publish</a></code></li>
 <li><code><a title="mqttrdc.mqtt_controller.MQTTController.on_subscribe" href="#mqttrdc.mqtt_controller.MQTTController.on_subscribe">on_subscribe</a></code></li>
+<li><code><a title="mqttrdc.mqtt_controller.MQTTController.skip_backward" href="#mqttrdc.mqtt_controller.MQTTController.skip_backward">skip_backward</a></code></li>
+<li><code><a title="mqttrdc.mqtt_controller.MQTTController.skip_forward" href="#mqttrdc.mqtt_controller.MQTTController.skip_forward">skip_forward</a></code></li>
 <li><code><a title="mqttrdc.mqtt_controller.MQTTController.start" href="#mqttrdc.mqtt_controller.MQTTController.start">start</a></code></li>
 <li><code><a title="mqttrdc.mqtt_controller.MQTTController.status" href="#mqttrdc.mqtt_controller.MQTTController.status">status</a></code></li>
 <li><code><a title="mqttrdc.mqtt_controller.MQTTController.stop" href="#mqttrdc.mqtt_controller.MQTTController.stop">stop</a></code></li>

@@ -93,6 +93,27 @@ class TestHandleMessage(TestCase):
             cmd = FakeMQTTMessage({"toggle": toggle})
             self.assertRaises(ValidationError, self.controller.handle_message, cmd)
 
+    @mock.patch("mqttrdc.mqtt_controller.MQTTController.skip_forward")
+    @mock.patch("mqttrdc.mqtt_controller.MQTTController.skip_backward")
+    def test_ctrl_commands(self, mock_skip_backward, mock_skip_forward):
+        mock_skip_forward.return_value = None
+        mock_skip_backward.return_value = None
+
+        # test skip forward
+        cmd = FakeMQTTMessage({"ctrl": ">>"})
+        self.controller.handle_message(cmd)
+        mock_skip_forward.assert_called_once()
+
+        # test skip backward
+        cmd = FakeMQTTMessage({"ctrl": "<<"})
+        self.controller.handle_message(cmd)
+        mock_skip_backward.assert_called_once()
+
+        # test not valid ctrl values
+        for toggle in ("forward", "backward", "+", "-", 1, 0):
+            cmd = FakeMQTTMessage({"ctrl": toggle})
+            self.assertRaises(ValidationError, self.controller.handle_message, cmd)
+
     def test_invalid_command(self):
         cmd = FakeMQTTMessage({"msg": "This is an invalid command"})
         self.assertRaises(ValueError, self.controller.handle_message, cmd)
